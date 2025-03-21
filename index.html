@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Code Explorer</title>
+  <!-- Basic CSS styling for the application -->
+  <style>
+    /* Global styles */
+    body { 
+      font-family: Arial, sans-serif; 
+      max-width: 800px; 
+      margin: 0 auto; 
+      padding: 20px;
+      line-height: 1.6;
+    }
+    
+    /* Search form styles */
+    .search-box { 
+      margin-bottom: 20px; 
+      display: flex;
+      align-items: center;
+    }
+    
+    /* Form controls */
+    input { 
+      padding: 8px; 
+      width: 300px; 
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    
+    button { 
+      padding: 8px 16px; 
+      background-color: #0366d6; /* GitHub blue */
+      color: white;
+      border: none;
+      border-radius: 4px;
+      margin-left: 10px;
+      cursor: pointer;
+    }
+    
+    button:hover {
+      background-color: #0056b3;
+    }
+    
+    /* Error message styling */
+    .error { 
+      color: red; 
+      font-weight: bold;
+    }
+    
+    /* Code display styles */
+    pre { 
+      background: #f5f5f5; 
+      padding: 10px; 
+      overflow: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    
+    /* Results list styling */
+    #results ul {
+      list-style-type: none;
+      padding-left: 0;
+    }
+    
+    #results li {
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+    }
+    
+    /* File content area */
+    #file-content {
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Application header -->
+  <h1>GitHub Code Explorer</h1>
+  <p>Search for code across public GitHub repositories</p>
+  
+  <!-- Search form -->
+  <div class="search-box">
+    <!-- Search input with GitHub search syntax examples -->
+    <input 
+      type="text" 
+      id="search-query" 
+      placeholder="Search query (e.g., 'function in:file language:javascript')"
+      aria-label="Search query"
+    >
+    <!-- Search submit button with click handler -->
+    <button onclick="searchCode()">Search</button>
+  </div>
+  
+  <!-- Container for search results -->
+  <div id="results">
+    <!-- Search results will be dynamically inserted here -->
+  </div>
+  
+  <!-- Container for file content display -->
+  <div id="file-content">
+    <!-- File content will be dynamically inserted here -->
+  </div>
+  
+  <!-- Load client-side JavaScript -->
+  <script src="client.js"></script>
+</body>
+</html>
