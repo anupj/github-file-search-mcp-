@@ -138,6 +138,64 @@ function logApiCall(method, url, request, response) {
   logs.insertBefore(logEntry, logs.firstChild);
 }
 
+// Simulate how an AI model would call a function through MCP
+async function simulateAIFunctionCall(userIntent) {
+  // Add a message showing the AI's reasoning process
+  addAiMessage("I need to search GitHub for information. Let me think about which function to call...");
+  
+  // Log the AI's "thinking" process
+  console.log("AI reasoning process:");
+  
+  // This simulates the AI model's decision-making process
+  let functionName = '';
+  let functionParameters = {};
+  
+  if (userIntent.includes("find code") || userIntent.includes("search for code")) {
+    console.log("User wants to find code - I'll use the search_code function");
+    
+    // AI determines the best parameters based on user intent
+    const searchTerm = userIntent.includes("react") 
+      ? "language:javascript filename:*.jsx React.Component" 
+      : "language:javascript " + userIntent.replace("find code", "").replace("search for code", "").trim();
+    
+    functionName = "search_code";
+    functionParameters = { q: searchTerm };
+  } else if (userIntent.includes("find repository") || userIntent.includes("search for repository")) {
+    console.log("User wants to find repositories - I'll use the search_repositories function");
+    
+    const searchTerm = userIntent.replace("find repository", "").replace("search for repository", "").trim();
+    
+    functionName = "search_repositories";
+    functionParameters = { q: searchTerm };
+  } else {
+    // Default to code search
+    console.log("No specific intent detected, defaulting to code search");
+    functionName = "search_code";
+    functionParameters = { q: "javascript " + userIntent };
+  }
+  
+  console.log(`AI decided to call ${functionName} with parameters:`, functionParameters);
+  
+  // Show the function call in the UI
+  const functionCallDetails = document.createElement('div');
+  functionCallDetails.className = 'ai-function-call';
+  functionCallDetails.innerHTML = `
+    <p><em>AI is calling function:</em></p>
+    <pre>${functionName}(${JSON.stringify(functionParameters, null, 2)})</pre>
+  `;
+  document.getElementById('ai-conversation').appendChild(functionCallDetails);
+  
+  // Make the actual function call
+  try {
+    const result = await callFunction(functionName, functionParameters);
+    console.log("Function call result:", result);
+    return { functionName, result };
+  } catch (error) {
+    console.error("Error in AI function call:", error);
+    return { functionName, error };
+  }
+}
+
 // Simulate an AI conversation with function calling
 async function simulateConversation() {
   const userInput = document.getElementById('user-input');
@@ -145,130 +203,55 @@ async function simulateConversation() {
   
   if (!userMessage) return;
   
+  // Display user message
   addUserMessage(userMessage);
   userInput.value = '';
   
-  // Add debugging info
-  console.log("Processing user message:", userMessage);
+  // Initial AI response
+  addAiMessage(aiResponses.searchCode || "Let me search for that information for you...");
   
-  // Simple intent detection with improved keyword matching
-  let intent = 'unknown';
-  let functionToCall = null;
-  let parameters = {};
+  // Simulate AI function calling process
+  const { functionName, result, error } = await simulateAIFunctionCall(userMessage);
   
-  const lowerInput = userMessage.toLowerCase();
-  console.log("Lower case input:", lowerInput);
-  
-  // More flexible keyword matching
-  const hasSearchIntent = lowerInput.includes('find') || 
-                         lowerInput.includes('search') || 
-                         lowerInput.includes('look for') || 
-                         lowerInput.includes('get') ||
-                         lowerInput.includes('show me');
-  
-  const hasCodeIntent = lowerInput.includes('code') || 
-                       lowerInput.includes('component') || 
-                       lowerInput.includes('file') ||
-                       lowerInput.includes('function') ||
-                       lowerInput.includes('script') ||
-                       lowerInput.includes('implementation');
-  
-  const hasRepoIntent = lowerInput.includes('repo') || 
-                       lowerInput.includes('repository') ||
-                       lowerInput.includes('project');
-  
-  console.log("Intent detection:", { hasSearchIntent, hasCodeIntent, hasRepoIntent });
-  
-  // Default to code search for simplicity in the demo
-  if (hasSearchIntent || true) { // Always trigger a search in this demo
-    if (hasCodeIntent || !hasRepoIntent) {
-      intent = 'searchCode';
-      functionToCall = 'search_code';
-      
-      // Extract search terms from user input or use default
-      let searchTerm = lowerInput;
-      if (lowerInput.includes('react')) searchTerm = 'react component';
-      else if (lowerInput.includes('angular')) searchTerm = 'angular component';
-      else if (lowerInput.includes('vue')) searchTerm = 'vue component';
-      else searchTerm = 'javascript ' + lowerInput; // Add 'javascript' to improve results
-      
-      parameters = { q: searchTerm };
-      console.log("Search code with:", parameters);
-    } else if (hasRepoIntent) {
-      intent = 'searchRepos';
-      functionToCall = 'search_repositories';
-      
-      // Extract search terms from user input or use default
-      let searchTerm = lowerInput.replace('repository', '').replace('repo', '').trim();
-      if (searchTerm.length < 3) searchTerm = 'javascript'; // Default
-      
-      parameters = { query: searchTerm };
-      console.log("Search repos with:", parameters);
-    }
-  } else if (lowerInput.includes('show') && lowerInput.includes('file')) {
-    intent = 'viewFile';
-    functionToCall = 'get_file_contents';
-    parameters = { 
-      owner: 'facebook', 
-      repo: 'react',
-      path: 'packages/react/src/React.js'
-    };
-    console.log("View file with:", parameters);
+  // Handle the result
+  if (error) {
+    addAiMessage(`I encountered an error: ${error.message}`);
+    return;
   }
   
-  // Add initial AI response based on detected intent
-  const aiResponse = aiResponses[intent] || aiResponses.default;
-  console.log("Selected AI response:", aiResponse);
-  addAiMessage(aiResponse);
-  
-  // For demo purposes, always try to call a function if none was detected
-  if (!functionToCall) {
-    functionToCall = 'search_code';
-    parameters = { q: 'javascript ' + lowerInput };
-    console.log("Fallback search with:", parameters);
-  }
-  
-  // Call the function
-  try {
-    const result = await callFunction(functionToCall, parameters);
+  if (result && result.status === 'success') {
+    let aiResponse = '';
     
-    if (result.status === 'success') {
-      let aiResponse = '';
+    if (functionName === 'search_code') {
+      const items = result.data.items || [];
+      aiResponse = `I found ${items.length} code results. Here are a few examples:\n\n`;
       
-      if (functionToCall === 'search_code') {
-        const items = result.data.items || [];
-        aiResponse = `I found ${items.length} code results. Here are a few examples:\n\n`;
-        
-        items.slice(0, 3).forEach((item, index) => {
-          aiResponse += `${index + 1}. ${item.repository.full_name}: ${item.path}\n`;
-        });
-        
-        aiResponse += '\nWould you like me to show you any of these files?';
-      } else if (functionToCall === 'search_repositories') {
-        const items = result.data.items || [];
-        aiResponse = `I found ${items.length} repositories. Here are a few examples:\n\n`;
-        
-        items.slice(0, 3).forEach((item, index) => {
-          aiResponse += `${index + 1}. ${item.full_name}: ${item.description || 'No description'}\n`;
-        });
-        
-        aiResponse += '\nWould you like more information about any of these repositories?';
-      } else if (functionToCall === 'get_file_contents') {
-        const content = result.data.content || '';
-        const preview = content.length > 200 ? content.substring(0, 200) + '...' : content;
-        
-        aiResponse = `Here's the file ${result.data.path} from ${result.data.repo}:\n\n`;
-        aiResponse += `\`\`\`\n${preview}\n\`\`\`\n\n`;
-        aiResponse += 'Would you like me to explain this code?';
-      }
+      items.slice(0, 3).forEach((item, index) => {
+        aiResponse += `${index + 1}. ${item.repository.full_name}: ${item.path}\n`;
+      });
       
-      addAiMessage(aiResponse);
-    } else {
-      addAiMessage(`I ran into an issue: ${result.error}. Could you try a different query?`);
+      aiResponse += '\nWould you like me to show you any of these files?';
+    } else if (functionName === 'search_repositories') {
+      const items = result.data.items || [];
+      aiResponse = `I found ${items.length} repositories. Here are a few examples:\n\n`;
+      
+      items.slice(0, 3).forEach((item, index) => {
+        aiResponse += `${index + 1}. ${item.full_name}: ${item.description || 'No description'}\n`;
+      });
+      
+      aiResponse += '\nWould you like more information about any of these repositories?';
+    } else if (functionName === 'get_file_contents') {
+      const content = result.data.content || '';
+      const preview = content.length > 200 ? content.substring(0, 200) + '...' : content;
+      
+      aiResponse = `Here's the file ${result.data.path} from ${result.data.repo}:\n\n`;
+      aiResponse += `\`\`\`\n${preview}\n\`\`\`\n\n`;
+      aiResponse += 'Would you like me to explain this code?';
     }
-  } catch (error) {
-    console.error('Error in conversation flow:', error);
-    addAiMessage('Sorry, I encountered an error trying to process your request. Please try again.');
+    
+    addAiMessage(aiResponse);
+  } else {
+    addAiMessage(`I ran into an issue: ${result.error || 'Unknown error'}. Could you try a different query?`);
   }
 }
 

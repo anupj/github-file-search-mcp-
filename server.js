@@ -65,7 +65,7 @@ const functionDefinitions = [
     "parameters": {
       "type": "object",
       "properties": {
-        "query": {
+        "q": {
           "type": "string",
           "description": "Search query using GitHub's search syntax"
         },
@@ -73,12 +73,12 @@ const functionDefinitions = [
           "type": "number",
           "description": "Page number for pagination"
         },
-        "perPage": {
+        "per_page": {
           "type": "number",
           "description": "Results per page (max 100)"
         }
       },
-      "required": ["query"]
+      "required": ["q"]
     }
   }
 ];
@@ -137,11 +137,11 @@ const functions = {
   },
   
   search_repositories: async (parameters) => {
-    const { query, page = 1, perPage = 30 } = parameters;
+    const { q, page = 1, per_page = 30 } = parameters;
     
     try {
       const response = await axios.get(`${GITHUB_API}/search/repositories`, {
-        params: { q: query, page, per_page: perPage },
+        params: { q, page, per_page },
         headers: getHeaders()
       });
       

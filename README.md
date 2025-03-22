@@ -23,3 +23,34 @@ Model Context Protocol is a standardized way for AI models to interact with exte
 
 1. Clone this repository
 2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Optional: Set up a GitHub API token as the environment variable `GH_TOKEN` for higher rate limits
+
+## Usage
+
+1. Start the server:
+   ```bash
+   npm start
+   ```
+   or for development with auto-reload:
+   ```bash
+   npm run dev
+   ```
+
+2. Open your browser and navigate to http://localhost:3000
+3. Click "Load Available Functions" to see the API capabilities
+4. Type a query in the input box and press Enter to simulate an AI conversation
+
+## API Endpoints
+
+- `GET /api/mcp/functions` - List all available functions
+- `POST /api/mcp` - Call a function with parameters
+
+## Implementation Details
+
+The application consists of:
+- A Node.js/Express backend that wraps the GitHub API
+- A browser client that simulates an AI assistant using the API
+- MCP-compatible function definitions with JSON Schema
