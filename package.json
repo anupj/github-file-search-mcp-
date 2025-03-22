@@ -1,18 +1,26 @@
 {
-  "name": "github-file-search",
+  "name": "github-code-explorer-mcp",
   "version": "1.0.0",
-  "main": "client.js",
+  "description": "GitHub Code Explorer using Model Context Protocol",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "keywords": [
+    "mcp",
+    "github",
+    "ai",
+    "model-context-protocol"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
   "dependencies": {
-    "axios": "^1.8.4",
+    "axios": "^0.27.2",
     "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "express": "^4.18.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.19"
   }
 }

@@ -1,124 +1,209 @@
-// server.js - GitHub API Proxy Server
-// This server acts as a middleware between the frontend client and GitHub's API
-// It implements a Model Context Protocol for standardized function calling
+const express = require('express');
+const axios = require('axios');
+const cors = require('cors');
+const app = express();
 
-// Import required dependencies
-const express = require('express'); // Web server framework
-const axios = require('axios');     // HTTP client for API requests
-const cors = require('cors');       // Cross-Origin Resource Sharing middleware
-const app = express();              // Initialize Express application
+app.use(express.json());
+app.use(cors());
 
-// Configure Express middleware
-app.use(express.json());           // Parse JSON request bodies
-app.use(cors());                   // Enable CORS for all routes
-app.use(express.static('.'));      // Serve static files from current directory
-
-// GitHub API base URL for all API requests
+// GitHub API base URL
 const GITHUB_API = 'https://api.github.com';
 
-// Function definitions that our Model Context Protocol will expose to clients
+// Function definitions with schemas for MCP
+const functionDefinitions = [
+  {
+    "name": "search_code",
+    "description": "Search for code across GitHub repositories",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "q": {
+          "type": "string",
+          "description": "Search query using GitHub's search syntax"
+        },
+        "page": {
+          "type": "number",
+          "description": "Page number for pagination"
+        },
+        "per_page": {
+          "type": "number",
+          "description": "Results per page (max 100)"
+        }
+      },
+      "required": ["q"]
+    }
+  },
+  {
+    "name": "get_file_contents",
+    "description": "Get the contents of a file from a GitHub repository",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "description": "Repository owner (username or organization)"
+        },
+        "repo": {
+          "type": "string",
+          "description": "Repository name"
+        },
+        "path": {
+          "type": "string",
+          "description": "Path to the file"
+        },
+        "branch": {
+          "type": "string",
+          "description": "Branch name (defaults to main)"
+        }
+      },
+      "required": ["owner", "repo", "path"]
+    }
+  },
+  {
+    "name": "search_repositories",
+    "description": "Search for GitHub repositories",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query using GitHub's search syntax"
+        },
+        "page": {
+          "type": "number",
+          "description": "Page number for pagination"
+        },
+        "perPage": {
+          "type": "number",
+          "description": "Results per page (max 100)"
+        }
+      },
+      "required": ["query"]
+    }
+  }
+];
+
+// Function implementations
 const functions = {
-  // Search for code in GitHub repositories
-  // Parameters:
-  // - q: Search query string (required)
-  // - page: Page number for pagination (default: 1)
-  // - per_page: Number of results per page (default: 30)
-  search_code: async ({q, page = 1, per_page = 30}) => {
+  search_code: async (parameters) => {
+    const { q, page = 1, per_page = 30 } = parameters;
+    
     try {
-      // Make request to GitHub's code search endpoint
       const response = await axios.get(`${GITHUB_API}/search/code`, {
-        params: {q, page, per_page},  // Query parameters
-        headers: getHeaders()         // Authentication and Accept headers
+        params: { q, page, per_page },
+        headers: getHeaders()
       });
-      return response.data;           // Return the raw GitHub API response
+      return {
+        status: "success",
+        data: response.data
+      };
     } catch (error) {
-      // Handle errors gracefully
-      return {error: error.message};  // Return error in a structured format
+      return {
+        status: "error",
+        error: error.message
+      };
     }
   },
   
-  // Get contents of a specific file from GitHub
-  // Parameters:
-  // - owner: Repository owner username (required)
-  // - repo: Repository name (required)
-  // - path: File path within the repository (required)
-  // - branch: Branch name (default: 'main')
-  get_file_contents: async ({owner, repo, path, branch = 'main'}) => {
+  get_file_contents: async (parameters) => {
+    const { owner, repo, path, branch = 'main' } = parameters;
+    
     try {
-      // Make request to GitHub's contents endpoint
       const response = await axios.get(
-        `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}`, 
+        `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}`,
         {
-          params: {ref: branch},     // Reference (branch) parameter
-          headers: getHeaders()       // Authentication and Accept headers
+          params: { ref: branch },
+          headers: getHeaders()
         }
       );
       
-      // GitHub returns content as base64 encoded, so we decode it
+      // GitHub returns content as base64
       const content = Buffer.from(response.data.content, 'base64').toString();
-      // Return a simplified response with just the needed fields
-      return {content, path, repo};
+      
+      return {
+        status: "success",
+        data: {
+          content,
+          path,
+          repo: `${owner}/${repo}`
+        }
+      };
     } catch (error) {
-      // Handle errors gracefully
-      return {error: error.message};  // Return error in a structured format
+      return {
+        status: "error",
+        error: error.message
+      };
     }
   },
   
-  // Search for GitHub repositories
-  // Parameters:
-  // - query: Search query string (required)
-  // - page: Page number for pagination (default: 1)
-  // - perPage: Number of results per page (default: 30)
-  search_repositories: async ({query, page = 1, perPage = 30}) => {
+  search_repositories: async (parameters) => {
+    const { query, page = 1, perPage = 30 } = parameters;
+    
     try {
-      // Make request to GitHub's repository search endpoint
       const response = await axios.get(`${GITHUB_API}/search/repositories`, {
-        params: {q: query, page, per_page: perPage},  // Query parameters
-        headers: getHeaders()                         // Authentication and Accept headers
+        params: { q: query, page, per_page: perPage },
+        headers: getHeaders()
       });
-      return response.data;  // Return the raw GitHub API response
+      
+      return {
+        status: "success",
+        data: response.data
+      };
     } catch (error) {
-      // Handle errors gracefully
-      return {error: error.message};  // Return error in a structured format
+      return {
+        status: "error",
+        error: error.message
+      };
     }
   }
 };
 
-// Helper function for constructing GitHub API request headers
-// Adds authentication token if available in environment variables
+// Helper function for authentication headers
 function getHeaders() {
   return {
-    'Accept': 'application/vnd.github.v3+json',  // Specify GitHub API version
-    'Authorization': process.env.GITHUB_TOKEN ? 
-      `token ${process.env.GITHUB_TOKEN}` : ''   // Add token if available, empty string if not
+    'Accept': 'application/vnd.github.v3+json',
+    'Authorization': process.env.GH_TOKEN ? 
+      `token ${process.env.GH_TOKEN}` : ''
   };
 }
 
-// Model Context Protocol endpoint - handles function calls from client
-app.post('/api/context', async (req, res) => {
-  // Extract function name and parameters from request body
-  const {name, parameters} = req.body;
+// MCP endpoint
+app.post('/api/mcp', async (req, res) => {
+  // The request should contain a name and parameters
+  const { name, parameters } = req.body;
   
-  // Validate that the requested function exists
+  // Validate that the function exists
   if (!functions[name]) {
     return res.status(400).json({
-      error: `Function '${name}' is not defined`  // Return 400 for undefined functions
+      status: "error",
+      error: `Function '${name}' is not defined`
     });
   }
   
   try {
-    // Dynamically call the requested function with provided parameters
+    // Execute the function with the provided parameters
     const result = await functions[name](parameters);
-    res.json(result);  // Return JSON response with function result
+    
+    // Return the standardized result
+    res.json(result);
   } catch (error) {
-    // Handle unexpected errors
-    res.status(500).json({error: error.message});  // Return 500 internal server error
+    res.status(500).json({
+      status: "error",
+      error: error.message
+    });
   }
 });
 
-// Configure server port - use environment variable or default to 3000
+// Endpoint to get available functions - this allows discovery
+app.get('/api/mcp/functions', (req, res) => {
+  res.json(functionDefinitions);
+});
+
+// Serve static files from the 'public' directory
+app.use(express.static('./'));
+
 const PORT = process.env.PORT || 3000;
-// Start the server and listen on the configured port
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);  // Log when server starts successfully
+  console.log(`MCP Server running on port ${PORT}`);
+  console.log(`Function discovery available at http://localhost:${PORT}/api/mcp/functions`);
 });

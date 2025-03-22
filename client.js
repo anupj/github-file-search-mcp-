@@ -1,156 +1,286 @@
-// client.js - Frontend Client for GitHub Code Explorer
-// This client implements the browser-side functionality to interact with the server's Model Context Protocol
-// and render the search results and file contents in the UI
+// MCP Server API URL
+const API_URL = 'http://localhost:3000/api/mcp';
+const FUNCTIONS_URL = 'http://localhost:3000/api/mcp/functions';
 
-// API endpoint URL for Model Context Protocol requests
-const API_URL = 'http://localhost:3000/api/context';
+// Store available functions
+let availableFunctions = [];
 
-/**
- * Model Context Protocol client implementation
- * Makes standardized function calls to the server API
- * 
- * @param {string} name - The function name to call on the server
- * @param {object} parameters - The parameters to pass to the function
- * @returns {Promise<object>} - The parsed JSON response from the server
- * @throws {Error} - If the API call fails
- */
-async function callFunction(name, parameters) {
-  // Make the API request to the server
-  const response = await fetch(API_URL, {
-    method: 'POST',                                 // Always use POST for function calls
-    headers: {'Content-Type': 'application/json'},  // Send JSON data
-    body: JSON.stringify({name, parameters})        // Format body according to protocol
-  });
-  
-  // Handle non-200 responses
-  if (!response.ok) {
-    throw new Error(`API call failed: ${response.statusText}`);
-  }
-  
-  // Parse and return the JSON response
-  return response.json();
-}
+// Sample AI responses for simulation
+const aiResponses = {
+  default: "I'm not sure how to help with that. Could you try asking about GitHub code or repositories?",
+  searchCode: "I'll search for code examples on GitHub for you. Let me do that now...",
+  searchRepos: "I'll look for repositories that match your query. One moment please...",
+  viewFile: "Let me fetch that file for you so we can look at the code...",
+};
 
-/**
- * UI Function: Perform code search when user submits search form
- * Calls the server's search_code function and displays results
- */
-async function searchCode() {
-  // Get the user's search query from the input field
-  const query = document.getElementById('search-query').value;
-  const resultsDiv = document.getElementById('results');
-  // Show loading indicator
-  resultsDiv.innerHTML = '<p>Searching...</p>';
-  
+// Load available functions from the server
+async function loadFunctions() {
   try {
-    // Call the server's search_code function with the query
-    const data = await callFunction('search_code', {
-      q: query  // Pass query parameter according to GitHub API requirements
-    });
-    
-    // Handle error responses from the server
-    if (data.error) {
-      resultsDiv.innerHTML = `<p class="error">Error: ${data.error}</p>`;
-      return;
+    const response = await fetch(FUNCTIONS_URL);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch functions: ${response.statusText}`);
     }
     
-    // Display the search results in the UI
-    displayCodeResults(data);
+    availableFunctions = await response.json();
+    
+    // Populate the dropdown
+    const select = document.getElementById('function-select');
+    select.innerHTML = '<option value="">Select a function...</option>';
+    
+    availableFunctions.forEach(func => {
+      const option = document.createElement('option');
+      option.value = func.name;
+      option.textContent = `${func.name} - ${func.description}`;
+      select.appendChild(option);
+    });
+    
+    logApiCall('GET', FUNCTIONS_URL, null, availableFunctions);
+    
+    // Add AI response about available tools
+    addAiMessage("I've loaded my available tools. I can search for code, get file contents, or search for repositories on GitHub. What would you like to find?");
   } catch (error) {
-    // Handle client-side errors (e.g., network issues)
-    resultsDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+    console.error('Error loading functions:', error);
+    logApiCall('GET', FUNCTIONS_URL, null, { error: error.message });
+    addAiMessage("I'm having trouble connecting to my tools right now. Please try again later.");
   }
 }
 
-/**
- * UI Function: View contents of a specific file
- * Calls the server's get_file_contents function and displays the file
- * 
- * @param {string} owner - GitHub repository owner username
- * @param {string} repo - GitHub repository name
- * @param {string} path - File path within the repository
- */
-async function viewFileContents(owner, repo, path) {
-  const contentDiv = document.getElementById('file-content');
-  // Show loading indicator
-  contentDiv.innerHTML = '<p>Loading file...</p>';
+// Display function details
+function showFunctionDetails() {
+  const select = document.getElementById('function-select');
+  const functionName = select.value;
   
-  try {
-    // Call the server's get_file_contents function with file details
-    const data = await callFunction('get_file_contents', {
-      owner,  // Repository owner (username)
-      repo,   // Repository name
-      path    // File path within the repository
-    });
-    
-    // Handle error responses from the server
-    if (data.error) {
-      contentDiv.innerHTML = `<p class="error">Error: ${data.error}</p>`;
-      return;
-    }
-    
-    // Display the file content with the file path as header
-    // Note: Basic display without syntax highlighting
-    contentDiv.innerHTML = `
-      <h3>${path}</h3>
-      <pre><code>${escapeHtml(data.content)}</code></pre>
+  if (!functionName) {
+    document.getElementById('function-details').innerHTML = '';
+    return;
+  }
+  
+  const functionInfo = availableFunctions.find(f => f.name === functionName);
+  
+  if (functionInfo) {
+    document.getElementById('function-details').innerHTML = `
+      <h3>Function: ${functionInfo.name}</h3>
+      <p>${functionInfo.description}</p>
+      <h4>Parameters:</h4>
+      <pre>${JSON.stringify(functionInfo.parameters, null, 2)}</pre>
     `;
-  } catch (error) {
-    // Handle client-side errors (e.g., network issues)
-    contentDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
   }
 }
 
-/**
- * Helper Function: Display code search results in the UI
- * Formats GitHub API search results into HTML list with clickable links
- * 
- * @param {object} data - The response data from GitHub's code search API
- */
-function displayCodeResults(data) {
-  const resultsDiv = document.getElementById('results');
-  
-  // Check if we have results to display
-  if (data.items && data.items.length > 0) {
-    // Begin building HTML with result count
-    let html = `<p>Found ${data.total_count} results:</p><ul>`;
+// MCP client implementation
+async function callFunction(name, parameters) {
+  try {
+    logApiCall('POST', API_URL, { name, parameters }, null);
     
-    // Loop through each search result item
-    data.items.forEach(item => {
-      // Create a list item with repository name and clickable file link
-      html += `
-        <li>
-          <strong>${item.repository.full_name}</strong>: 
-          <a href="#" onclick="viewFileContents('${item.repository.owner.login}', 
-                                              '${item.repository.name}', 
-                                              '${item.path}'); return false;">
-            ${item.path}
-          </a>
-        </li>
-      `;
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, parameters })
     });
     
-    // Finish the HTML list
-    html += '</ul>';
-    resultsDiv.innerHTML = html;
-  } else {
-    // No results found
-    resultsDiv.innerHTML = '<p>No results found.</p>';
+    if (!response.ok) {
+      throw new Error(`API call failed: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    logApiCall('Response', '', null, result);
+    
+    return result;
+  } catch (error) {
+    console.error(`Error calling function ${name}:`, error);
+    logApiCall('Error', '', { name, parameters }, { error: error.message });
+    return { status: 'error', error: error.message };
   }
 }
 
-/**
- * Helper Function: Escape HTML special characters to prevent XSS attacks
- * Converts potentially dangerous characters to their HTML entity equivalents
- * 
- * @param {string} text - The raw text that might contain HTML special characters
- * @returns {string} - The escaped HTML-safe text
- */
-function escapeHtml(text) {
-  return text
-    .replace(/&/g, "&amp;")   // Escape ampersands
-    .replace(/</g, "&lt;")    // Escape less-than signs
-    .replace(/>/g, "&gt;")    // Escape greater-than signs
-    .replace(/"/g, "&quot;")  // Escape double quotes
-    .replace(/'/g, "&#039;"); // Escape single quotes
+// Add a user message to the conversation
+function addUserMessage(message) {
+  const conversation = document.getElementById('ai-conversation');
+  const messageDiv = document.createElement('div');
+  messageDiv.className = 'user-message';
+  messageDiv.textContent = message;
+  conversation.appendChild(messageDiv);
+  conversation.scrollTop = conversation.scrollHeight;
 }
+
+// Add an AI message to the conversation
+function addAiMessage(message) {
+  const conversation = document.getElementById('ai-conversation');
+  const messageDiv = document.createElement('div');
+  messageDiv.className = 'ai-message';
+  messageDiv.textContent = message;
+  conversation.appendChild(messageDiv);
+  conversation.scrollTop = conversation.scrollHeight;
+}
+
+// Log API calls in the right panel
+function logApiCall(method, url, request, response) {
+  const logs = document.getElementById('api-logs');
+  const logEntry = document.createElement('div');
+  
+  let content = `<strong>${method}</strong> ${url || ''}<br>`;
+  
+  if (request) {
+    content += '<h4>Request:</h4>';
+    content += `<pre>${JSON.stringify(request, null, 2)}</pre>`;
+  }
+  
+  if (response) {
+    content += '<h4>Response:</h4>';
+    content += `<pre>${JSON.stringify(response, null, 2)}</pre>`;
+  }
+  
+  logEntry.innerHTML = content;
+  logEntry.style.borderBottom = '1px solid #ccc';
+  logEntry.style.paddingBottom = '10px';
+  logEntry.style.marginBottom = '10px';
+  
+  logs.insertBefore(logEntry, logs.firstChild);
+}
+
+// Simulate an AI conversation with function calling
+async function simulateConversation() {
+  const userInput = document.getElementById('user-input');
+  const userMessage = userInput.value.trim();
+  
+  if (!userMessage) return;
+  
+  addUserMessage(userMessage);
+  userInput.value = '';
+  
+  // Add debugging info
+  console.log("Processing user message:", userMessage);
+  
+  // Simple intent detection with improved keyword matching
+  let intent = 'unknown';
+  let functionToCall = null;
+  let parameters = {};
+  
+  const lowerInput = userMessage.toLowerCase();
+  console.log("Lower case input:", lowerInput);
+  
+  // More flexible keyword matching
+  const hasSearchIntent = lowerInput.includes('find') || 
+                         lowerInput.includes('search') || 
+                         lowerInput.includes('look for') || 
+                         lowerInput.includes('get') ||
+                         lowerInput.includes('show me');
+  
+  const hasCodeIntent = lowerInput.includes('code') || 
+                       lowerInput.includes('component') || 
+                       lowerInput.includes('file') ||
+                       lowerInput.includes('function') ||
+                       lowerInput.includes('script') ||
+                       lowerInput.includes('implementation');
+  
+  const hasRepoIntent = lowerInput.includes('repo') || 
+                       lowerInput.includes('repository') ||
+                       lowerInput.includes('project');
+  
+  console.log("Intent detection:", { hasSearchIntent, hasCodeIntent, hasRepoIntent });
+  
+  // Default to code search for simplicity in the demo
+  if (hasSearchIntent || true) { // Always trigger a search in this demo
+    if (hasCodeIntent || !hasRepoIntent) {
+      intent = 'searchCode';
+      functionToCall = 'search_code';
+      
+      // Extract search terms from user input or use default
+      let searchTerm = lowerInput;
+      if (lowerInput.includes('react')) searchTerm = 'react component';
+      else if (lowerInput.includes('angular')) searchTerm = 'angular component';
+      else if (lowerInput.includes('vue')) searchTerm = 'vue component';
+      else searchTerm = 'javascript ' + lowerInput; // Add 'javascript' to improve results
+      
+      parameters = { q: searchTerm };
+      console.log("Search code with:", parameters);
+    } else if (hasRepoIntent) {
+      intent = 'searchRepos';
+      functionToCall = 'search_repositories';
+      
+      // Extract search terms from user input or use default
+      let searchTerm = lowerInput.replace('repository', '').replace('repo', '').trim();
+      if (searchTerm.length < 3) searchTerm = 'javascript'; // Default
+      
+      parameters = { query: searchTerm };
+      console.log("Search repos with:", parameters);
+    }
+  } else if (lowerInput.includes('show') && lowerInput.includes('file')) {
+    intent = 'viewFile';
+    functionToCall = 'get_file_contents';
+    parameters = { 
+      owner: 'facebook', 
+      repo: 'react',
+      path: 'packages/react/src/React.js'
+    };
+    console.log("View file with:", parameters);
+  }
+  
+  // Add initial AI response based on detected intent
+  const aiResponse = aiResponses[intent] || aiResponses.default;
+  console.log("Selected AI response:", aiResponse);
+  addAiMessage(aiResponse);
+  
+  // For demo purposes, always try to call a function if none was detected
+  if (!functionToCall) {
+    functionToCall = 'search_code';
+    parameters = { q: 'javascript ' + lowerInput };
+    console.log("Fallback search with:", parameters);
+  }
+  
+  // Call the function
+  try {
+    const result = await callFunction(functionToCall, parameters);
+    
+    if (result.status === 'success') {
+      let aiResponse = '';
+      
+      if (functionToCall === 'search_code') {
+        const items = result.data.items || [];
+        aiResponse = `I found ${items.length} code results. Here are a few examples:\n\n`;
+        
+        items.slice(0, 3).forEach((item, index) => {
+          aiResponse += `${index + 1}. ${item.repository.full_name}: ${item.path}\n`;
+        });
+        
+        aiResponse += '\nWould you like me to show you any of these files?';
+      } else if (functionToCall === 'search_repositories') {
+        const items = result.data.items || [];
+        aiResponse = `I found ${items.length} repositories. Here are a few examples:\n\n`;
+        
+        items.slice(0, 3).forEach((item, index) => {
+          aiResponse += `${index + 1}. ${item.full_name}: ${item.description || 'No description'}\n`;
+        });
+        
+        aiResponse += '\nWould you like more information about any of these repositories?';
+      } else if (functionToCall === 'get_file_contents') {
+        const content = result.data.content || '';
+        const preview = content.length > 200 ? content.substring(0, 200) + '...' : content;
+        
+        aiResponse = `Here's the file ${result.data.path} from ${result.data.repo}:\n\n`;
+        aiResponse += `\`\`\`\n${preview}\n\`\`\`\n\n`;
+        aiResponse += 'Would you like me to explain this code?';
+      }
+      
+      addAiMessage(aiResponse);
+    } else {
+      addAiMessage(`I ran into an issue: ${result.error}. Could you try a different query?`);
+    }
+  } catch (error) {
+    console.error('Error in conversation flow:', error);
+    addAiMessage('Sorry, I encountered an error trying to process your request. Please try again.');
+  }
+}
+
+// Initialize the UI
+document.addEventListener('DOMContentLoaded', () => {
+  // Add initial AI message
+  addAiMessage("Hello! I'm an AI assistant that can help you find and explore code on GitHub. What would you like to search for?");
+  
+  // Set up enter key for user input
+  document.getElementById('user-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      simulateConversation();
+    }
+  });
+});

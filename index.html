@@ -3,108 +3,59 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GitHub Code Explorer</title>
-  <!-- Basic CSS styling for the application -->
+  <title>GitHub Code Explorer via MCP</title>
   <style>
-    /* Global styles */
-    body { 
-      font-family: Arial, sans-serif; 
-      max-width: 800px; 
-      margin: 0 auto; 
-      padding: 20px;
-      line-height: 1.6;
-    }
-    
-    /* Search form styles */
-    .search-box { 
-      margin-bottom: 20px; 
-      display: flex;
-      align-items: center;
-    }
-    
-    /* Form controls */
-    input { 
-      padding: 8px; 
-      width: 300px; 
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    
-    button { 
-      padding: 8px 16px; 
-      background-color: #0366d6; /* GitHub blue */
-      color: white;
-      border: none;
-      border-radius: 4px;
-      margin-left: 10px;
-      cursor: pointer;
-    }
-    
-    button:hover {
-      background-color: #0056b3;
-    }
-    
-    /* Error message styling */
-    .error { 
-      color: red; 
-      font-weight: bold;
-    }
-    
-    /* Code display styles */
-    pre { 
-      background: #f5f5f5; 
-      padding: 10px; 
-      overflow: auto;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    
-    /* Results list styling */
-    #results ul {
-      list-style-type: none;
-      padding-left: 0;
-    }
-    
-    #results li {
-      padding: 10px 0;
-      border-bottom: 1px solid #eee;
-    }
-    
-    /* File content area */
-    #file-content {
-      margin-top: 30px;
-    }
+    body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+    .container { display: flex; gap: 20px; }
+    .panel { flex: 1; border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+    .search-box { margin-bottom: 20px; }
+    input { padding: 8px; width: 300px; }
+    button { padding: 8px 16px; }
+    .error { color: red; }
+    pre { background: #f5f5f5; padding: 10px; overflow: auto; max-height: 400px; }
+    .tool-selection { margin-bottom: 20px; }
+    #ai-conversation { min-height: 300px; }
+    .user-message { background: #e6f7ff; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    .ai-message { background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    #function-details { margin-top: 20px; }
   </style>
 </head>
 <body>
-  <!-- Application header -->
-  <h1>GitHub Code Explorer</h1>
-  <p>Search for code across public GitHub repositories</p>
+  <h1>GitHub Code Explorer via Model Context Protocol</h1>
+  <p>This demo shows how an AI assistant might use MCP to search for code on GitHub</p>
   
-  <!-- Search form -->
-  <div class="search-box">
-    <!-- Search input with GitHub search syntax examples -->
-    <input 
-      type="text" 
-      id="search-query" 
-      placeholder="Search query (e.g., 'function in:file language:javascript')"
-      aria-label="Search query"
-    >
-    <!-- Search submit button with click handler -->
-    <button onclick="searchCode()">Search</button>
+  <div class="container">
+    <div class="panel">
+      <h2>AI Assistant Simulation</h2>
+      <div class="tool-selection">
+        <select id="function-select" onchange="showFunctionDetails()">
+          <option value="">Select a function...</option>
+        </select>
+        <button onclick="loadFunctions()">Load Available Functions</button>
+      </div>
+      
+      <div id="ai-conversation">
+        <div class="user-message">I need help finding React component examples on GitHub.</div>
+      </div>
+      
+      <div class="search-box">
+        <input type="text" id="user-input" placeholder="Type your message...">
+        <button onclick="simulateConversation()">Send</button>
+      </div>
+      
+      <div id="function-details">
+        <!-- Function details will be displayed here -->
+      </div>
+    </div>
+    
+    <div class="panel">
+      <h2>MCP API Calls</h2>
+      <div id="api-logs">
+        <!-- API calls will be logged here -->
+      </div>
+    </div>
   </div>
   
-  <!-- Container for search results -->
-  <div id="results">
-    <!-- Search results will be dynamically inserted here -->
-  </div>
-  
-  <!-- Container for file content display -->
-  <div id="file-content">
-    <!-- File content will be dynamically inserted here -->
-  </div>
-  
-  <!-- Load client-side JavaScript -->
   <script src="client.js"></script>
 </body>
 </html>
